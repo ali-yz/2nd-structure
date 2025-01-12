@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 
 # Check if correct arguments are provided
 if [[ $# -ne 4 ]]; then
@@ -21,7 +21,29 @@ mkdir -p "$DOWNLOAD_DIR" &&
 echo "Created download directory: $DOWNLOAD_DIR."
 
 # Step 3: Download files using curl with parallel processing
-cat "$OUTPUT_FILE" | xargs -n 1 -P "$PARALLEL_DOWNLOADS" curl -O -J -L --output-dir "$DOWNLOAD_DIR" &&
-echo "Downloaded files to $DOWNLOAD_DIR."
+SUCCESS_COUNT=0
+TOTAL_COUNT=0
+
+# Function to download a single file and count success
+_download_file() {
+  URL=$1
+  OUTPUT_DIR=$2
+
+  if curl -O -J -L --output-dir "$OUTPUT_DIR" "$URL"; then
+    ((SUCCESS_COUNT++))
+  fi
+  ((TOTAL_COUNT++))
+}
+
+export -f _download_file
+export DOWNLOAD_DIR
+export SUCCESS_COUNT
+export TOTAL_COUNT
+
+# Download files in parallel
+cat "$OUTPUT_FILE" | xargs -n 1 -P "$PARALLEL_DOWNLOADS" bash -c '_download_file "$@"' _
+
+# Display summary
+echo "Downloaded $SUCCESS_COUNT out of $TOTAL_COUNT files successfully to $DOWNLOAD_DIR."
 
 exit 0
