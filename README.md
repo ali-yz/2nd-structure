@@ -2,6 +2,20 @@
 
 Model-Free Assignment of Protein Secondary Structure using Structural Encoding
 
+# Installation
+I used uv for python dependency management.
+
+```
+uv install
+```
+
+If you need the PyMol visualization, you need to install it separately and add it to PATH. Example on MacOS:
+
+```
+brew install pymol
+```
+
+
 ## How Each Part Works
 
 ### PDB Download Script
