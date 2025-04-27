@@ -1,5 +1,6 @@
 # custom
 data/test
+data/dev
 **.gz
 
 # Byte-compiled / optimized / DLL files
