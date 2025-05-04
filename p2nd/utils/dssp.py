@@ -2,14 +2,14 @@
 from Bio.PDB import DSSP
 
 
-def model_to_dssp(model, in_file):
+def model_to_dssp(model, in_file, dssp_executable="/usr/local/bin/mkdssp"):
     """
     Convert a Bio.PDB model to DSSP labels.
     :param model: Bio.PDB model
     :param in_file: Path to the mmCIF file
     :return: list of DSSP labels
     """
-    dssp = DSSP(model=model, in_file=in_file, dssp="mkdssp", file_type="mmCIF")
+    dssp = DSSP(model=model, in_file=in_file, dssp=dssp_executable, file_type="mmCIF")
     
     return dssp
 
