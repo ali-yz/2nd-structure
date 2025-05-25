@@ -1,49 +1,67 @@
-#!/bin/zsh
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Check if correct arguments are provided
+# ------------------------------------------------------------------
+# Usage check
+# ------------------------------------------------------------------
 if [[ $# -ne 4 ]]; then
   echo "Usage: $0 <input_file> <output_file> <download_dir> <parallel_downloads>"
   exit 1
 fi
 
-# Parse arguments
-INPUT_FILE=$1          # File containing PDB IDs (e.g., pdb_ids.txt)
-OUTPUT_FILE=$2         # File to save generated URLs (e.g., pdb_urls.txt)
-DOWNLOAD_DIR=$3        # Directory to download files (e.g., mmCIF)
-PARALLEL_DOWNLOADS=$4  # Number of parallel downloads (e.g., 10)
+INPUT_FILE=$1          # e.g. ./data/small/pdb_ids.txt
+OUTPUT_FILE=$2         # e.g. ./data/small/pdb_urls.txt
+DOWNLOAD_DIR=$3        # e.g. ./data/small/mmCIF
+PARALLEL_DOWNLOADS=$4  # e.g. 10
 
-# Step 1: Generate the list of URLs
-awk '{printf "https://files.rcsb.org/pub/pdb/data/structures/divided/mmCIF/%s/%s.cif.gz\n", substr($1, 2, 2), $1}' "$INPUT_FILE" > "$OUTPUT_FILE" &&
-echo "Generated URLs and saved to $OUTPUT_FILE."
+# ------------------------------------------------------------------
+# 1) Generate the list of mmCIF URLs
+# ------------------------------------------------------------------
+awk '{
+  # substr($1,2,2) picks the 2nd & 3rd characters of the PDB ID
+  printf "https://files.rcsb.org/pub/pdb/data/structures/divided/mmCIF/%s/%s.cif.gz\n",
+         substr($1,2,2), $1
+}' "$INPUT_FILE" > "$OUTPUT_FILE"
 
-# Step 2: Create the download directory if it doesn't exist
-mkdir -p "$DOWNLOAD_DIR" &&
-echo "Created download directory: $DOWNLOAD_DIR."
+URL_COUNT=$(wc -l < "$OUTPUT_FILE")
+echo "Generated $URL_COUNT URLs and saved to $OUTPUT_FILE."
 
-# Step 3: Download files using curl with parallel processing
-SUCCESS_COUNT=0
-TOTAL_COUNT=0
+# ------------------------------------------------------------------
+# 2) Create (or clean) download directory
+# ------------------------------------------------------------------
+mkdir -p "$DOWNLOAD_DIR"
+echo "Download directory is $DOWNLOAD_DIR."
 
-# Function to download a single file and count success
-_download_file() {
-  URL=$1
-  OUTPUT_DIR=$2
+# ------------------------------------------------------------------
+# 3) Download in parallel via xargs → curl
+# ------------------------------------------------------------------
+echo "Starting downloads of $URL_COUNT files (up to $PARALLEL_DOWNLOADS in parallel)…"
 
-  if curl -O -J -L --output-dir "$OUTPUT_DIR" "$URL"; then
-    ((SUCCESS_COUNT++))
-  fi
-  ((TOTAL_COUNT++))
-}
-
-export -f _download_file
+# Export so child bash instances see it
 export DOWNLOAD_DIR
-export SUCCESS_COUNT
-export TOTAL_COUNT
 
-# Download files in parallel
-cat "$OUTPUT_FILE" | xargs -n 1 -P "$PARALLEL_DOWNLOADS" bash -c '_download_file "$@"' _
+# Run xargs without -a (BSD/macOS compatible):
+#  • -n1       → one URL per exec
+#  • -P        → parallelism
+#  • -I{}      → substitute {} with each URL
+#  • bash -c   → executes the curl+echo; '_' is $0 inside that shell
+#  • success.log captures URLs that returned 0
+#  • errors.log captures any curl failures (stdout+stderr from curl)
+cat "$OUTPUT_FILE" \
+  | xargs -n1 -P"$PARALLEL_DOWNLOADS" -I{} bash -c \
+      'curl -sSf -O -J -L --output-dir "$DOWNLOAD_DIR" "{}" && echo "{}"' _ \
+      > "$DOWNLOAD_DIR/success.log" \
+      2> "$DOWNLOAD_DIR/errors.log"
 
-# Display summary
-echo "Downloaded $SUCCESS_COUNT out of $TOTAL_COUNT files successfully to $DOWNLOAD_DIR."
+# ------------------------------------------------------------------
+# 4) Summary
+# ------------------------------------------------------------------
+SUCCESS=$(wc -l < "$DOWNLOAD_DIR/success.log")
+echo "Downloaded $SUCCESS out of $URL_COUNT files successfully to $DOWNLOAD_DIR."
+
+if [[ -s "$DOWNLOAD_DIR/errors.log" ]]; then
+  FAILURES=$(( URL_COUNT - SUCCESS ))
+  echo "  ↳ $FAILURES failed downloads. See $DOWNLOAD_DIR/errors.log for details."
+fi
 
 exit 0

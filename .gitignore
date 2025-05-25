@@ -4,6 +4,12 @@ data/dev
 **.gz
 **.npy
 **.npz
+**.zip
+Bonsai-data-representation-main/*
+run_bonsai/data_folder
+run_bonsai/results
+run_bonsai/labels.tsv
+SCOPe.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -176,3 +182,4 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+SCOPe.csv
